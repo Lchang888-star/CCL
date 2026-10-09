@@ -1,226 +1,189 @@
-// Creature Prototype: a walking cat.
+// Creature Prototype: an abstract cat.
 // Built on the template: an 800x500 canvas, draw() only calls drawCreature(),
 // and every shape is placed relative to the origin at the center of the canvas.
-// Press the mouse to startle the cat.
+// Only the signs of a cat are kept (pointed ears, slit eyes, whiskers, tails,
+// toe beans) and rearranged around a soft, breathing blob.
+// Hold the mouse down and the cat curls up.
 
-// picked once in setup() so every run gives a slightly different cat
-let furR, furG, furB;
-let stripeCount;
-let eyeSize;
+let bodyColor;
+let tailCount;
+let curl = 0; // 0 = open and relaxed, 1 = fully curled up
 
 function setup() {
   createCanvas(800, 500);
-  furR = random(200, 255);
-  furG = random(110, 170);
-  furB = random(40, 90);
-  stripeCount = floor(random(3, 6));
-  eyeSize = random(24, 32);
+  bodyColor = color(random(230, 255), random(170, 215), random(20, 70));
+  tailCount = floor(random(3, 6));
 }
 
 function draw() {
-  background(245, 238, 225);
+  background(25, 95, 100);
   drawCreature();
 }
 
 function drawCreature() {
   push();
   translate(width / 2, height / 2); // (0, 0) is now the center of the canvas
+  rotate(map(mouseX, 0, width, -0.2, 0.2)); // the whole cat leans toward the mouse
 
-  stroke(50);
-  strokeWeight(3);
+  // ease toward curled up while the mouse is held, back out when it's released
+  curl = lerp(curl, mouseIsPressed ? 1 : 0, 0.08);
 
-  let scared = mouseIsPressed;
-  let step = scared ? 0 : frameCount * 0.08; // walk cycle, frozen when startled
-  let swing = sin(step) * 0.35; // how far the legs swing
-  let bob = -abs(sin(step)) * 5; // the body rises a little with each step
-  let breath = sin(frameCount * 0.05) * 4; // the body swells and shrinks
+  let breath = 1 + sin(frameCount * 0.05) * 0.05;
+  let bodyR = 110 * breath * (1 - curl * 0.15);
 
-  // far-side legs are darker so they read as further away
-  drawLeg(-125, 40 + bob, 100, swing, 0.75);
-  drawLeg(80, 40 + bob, 100, -swing, 0.75);
-  drawTail(-150, -10 + bob, 12, 16, 22, scared);
-  drawLeg(-95, 45 + bob, 100, -swing, 1);
-  drawLeg(110, 45 + bob, 100, swing, 1);
+  // tails fan out from the back, alternating red, black and white
+  let tailColors = [color(230, 50, 40), color(20), color(245)];
+  for (let i = 0; i < tailCount; i++) {
+    push();
+    rotate(map(i, 0, tailCount - 1, PI * 0.7, PI * 1.2));
+    translate(bodyR * 0.8, 0);
+    drawTail(14, 14, 20, i * 1.3, tailColors[i % 3]);
+    pop();
+  }
 
-  drawBody(0, bob, 320, 150 + breath);
-  drawHead(165, -70 + bob, scared);
+  // ears float above the body instead of being attached to it
+  let earY = -bodyR - 25 + sin(frameCount * 0.08) * 8;
+  drawEar(-55, earY, -0.4 - curl * 0.8, 70, color(20));
+  drawEar(55, earY, 0.4 + curl * 0.8, 70, color(230, 50, 40));
+
+  // two paws knead under the body, out of step with each other
+  drawPaw(-50, bodyR * 0.85 + sin(frameCount * 0.12) * 8, 34);
+  drawPaw(50, bodyR * 0.85 + sin(frameCount * 0.12 + PI) * 8, 34);
+
+  drawBody(bodyR);
+
+  // one big eye and one small one
+  drawEye(-38, -18, 64);
+  drawEye(42, -30, 40);
+
+  fill(240, 120, 150);
+  noStroke();
+  triangle(-9, 18, 9, 18, 0, 28); // nose
+
+  // three whiskers per side; they fold away as the cat curls up
+  let whiskerLen = (85 + sin(frameCount * 0.07) * 10) * (1 - curl);
+  for (let i = -1; i <= 1; i++) {
+    drawWhisker(20, 25, i * 0.3, whiskerLen); // right side
+    drawWhisker(-20, 25, PI - i * 0.3, whiskerLen); // left side
+  }
 
   pop();
 }
 
-// A leg that swings from its hip or shoulder at (x, y).
-// shade darkens the fur color: 1 is the normal color, lower is darker.
-function drawLeg(x, y, len, angle, shade) {
+// A blob built with vertex(). noise() nudges the edge so it never sits still.
+function drawBody(r) {
   push();
-  translate(x, y);
-  rotate(angle);
-  fill(furR * shade, furG * shade, furB * shade);
-  rect(-14, 0, 28, len, 14);
-  ellipse(0, len, 38, 20); // paw
+  fill(bodyColor);
+  stroke(20);
+  strokeWeight(4);
+  beginShape();
+  for (let a = 0; a < TWO_PI; a += 0.1) {
+    let wobble = map(noise(cos(a) + 1, sin(a) + 1, frameCount * 0.01), 0, 1, 0.88, 1.12);
+    vertex(cos(a) * r * wobble, sin(a) * r * wobble);
+  }
+  endShape(CLOSE);
   pop();
 }
 
-// A tail made of short segments, each rotated a bit further than the last,
-// so a single sin() wave travels down it like a whip.
-function drawTail(x, y, segments, segLen, thickness, scared) {
-  let speed = scared ? 0.3 : 0.06; // lashes fast when startled
-  let puff = scared ? 1.7 : 1; // and the fur puffs up
-
-  // outline pass, then the fur pass on top of it
-  tailPass(x, y, segments, segLen, thickness * puff + 6, speed, color(50));
-  tailPass(x, y, segments, segLen, thickness * puff, speed, color(furR, furG, furB));
-}
-
-function tailPass(x, y, segments, segLen, thickness, speed, c) {
+// A tail of short segments. Each one rotates from where the last one ended,
+// so the sin() wave travels down the tail; curling adds a bend to every joint.
+function drawTail(segments, segLen, thickness, phase, c) {
   push();
-  translate(x, y);
-  rotate(-2.4); // start pointing up and back
   stroke(c);
   strokeCap(ROUND);
   for (let i = 0; i < segments; i++) {
-    rotate(0.12 + sin(frameCount * speed - i * 0.5) * 0.12);
-    strokeWeight(thickness * map(i, 0, segments - 1, 1, 0.6)); // taper to the tip
+    rotate(sin(frameCount * 0.05 + phase - i * 0.4) * 0.25 + curl * 0.35);
+    strokeWeight(thickness * map(i, 0, segments - 1, 1, 0.3)); // taper to the tip
     line(0, 0, segLen, 0);
-    translate(segLen, 0); // the next segment starts where this one ends
+    translate(segLen, 0);
   }
-  pop();
-}
-
-// The body is a custom vertex shape: an ellipse with a flatter belly.
-function drawBody(x, y, w, h) {
-  push();
-  translate(x, y);
-
-  fill(furR, furG, furB);
-  beginShape();
-  for (let a = 0; a < TWO_PI; a += 0.1) {
-    let px = (cos(a) * w) / 2;
-    let py = (sin(a) * h) / 2;
-    if (py > 0) {
-      py *= 0.8;
-    }
-    vertex(px, py);
-  }
-  endShape(CLOSE);
-
-  fill(255, 240, 220); // pale belly
-  ellipse(10, h * 0.18, w * 0.55, h * 0.35);
-
-  // tabby stripes hanging down from the back
-  for (let i = 0; i < stripeCount; i++) {
-    let sx = map(i, 0, stripeCount - 1, -w * 0.32, w * 0.12);
-    let topY = (-h / 2) * sqrt(1 - sq((2 * sx) / w));
-    drawStripe(sx, topY, h * 0.3);
-  }
-
-  pop();
-}
-
-function drawStripe(x, y, len) {
-  push();
-  translate(x, y);
   noStroke();
-  fill(furR * 0.6, furG * 0.6, furB * 0.6);
-  beginShape();
-  vertex(-10, 2);
-  vertex(10, 2);
-  vertex(0, len);
-  endShape(CLOSE);
+  fill(c);
+  circle(0, 0, thickness * 0.8); // a dot on the tip
   pop();
 }
 
-function drawHead(x, y, scared) {
-  push();
-  translate(x, y);
-  rotate(map(mouseY, 0, height, -0.25, 0.25)); // tilt toward the mouse
-
-  let flat = scared ? 0.9 : 0; // ears flatten when startled
-  let twitch = map(noise(frameCount * 0.03), 0, 1, -0.4, 0.4);
-  drawEar(-42, -40, -0.35 - flat, 60);
-  drawEar(42, -40, 0.35 + flat + twitch, 60);
-
-  fill(furR, furG, furB);
-  ellipse(0, 0, 150, 130);
-
-  drawEye(-30, -10, eyeSize, scared);
-  drawEye(30, -10, eyeSize, scared);
-
-  fill(240, 130, 150);
-  triangle(-8, 12, 8, 12, 0, 21); // nose
-
-  if (scared) {
-    fill(80, 20, 30);
-    ellipse(0, 36, 22, 26); // hiss
-  } else {
-    noFill();
-    arc(-6, 24, 12, 12, 0, PI);
-    arc(6, 24, 12, 12, 0, PI);
-  }
-
-  drawWhiskers(1); // right side
-  drawWhiskers(-1); // left side, mirrored
-
-  pop();
-}
-
-// A triangular ear made with vertex(), rotated around its base at (x, y).
-function drawEar(x, y, angle, size) {
+// A pointed ear made with vertex(), rotated around its base at (x, y).
+function drawEar(x, y, angle, size, c) {
   push();
   translate(x, y);
   rotate(angle);
-
-  fill(furR, furG, furB);
+  fill(c);
+  stroke(20);
+  strokeWeight(4);
   beginShape();
-  vertex(-size * 0.5, 0);
+  vertex(-size * 0.45, 0);
   vertex(0, -size);
-  vertex(size * 0.5, 0);
+  vertex(size * 0.45, 0);
   endShape(CLOSE);
 
-  fill(250, 180, 190); // pink inside
   noStroke();
+  fill(240, 120, 150);
   beginShape();
-  vertex(-size * 0.28, -size * 0.1);
-  vertex(0, -size * 0.75);
-  vertex(size * 0.28, -size * 0.1);
+  vertex(-size * 0.2, -size * 0.12);
+  vertex(0, -size * 0.65);
+  vertex(size * 0.2, -size * 0.12);
   endShape(CLOSE);
-
   pop();
 }
 
-// An eye whose pupil follows the mouse and widens when startled.
-function drawEye(x, y, size, scared) {
+// Concentric rings with a slit pupil that follows the mouse.
+// The eye squeezes shut as the cat curls up, and blinks now and then.
+function drawEye(x, y, size) {
   push();
   translate(x, y);
 
-  let blinking = frameCount % 200 < 7 && !scared;
-  if (blinking) {
-    line(-size / 2, 0, size / 2, 0);
-  } else {
-    fill(140, 200, 80);
-    ellipse(0, 0, size, size * 1.1);
-
-    let lookX = map(mouseX, 0, width, -size * 0.2, size * 0.2);
-    let lookY = map(mouseY, 0, height, -size * 0.2, size * 0.2);
-    let pupilW = scared ? size * 0.7 : size * 0.25;
-    fill(20);
-    ellipse(lookX, lookY, pupilW, size * 0.8);
-
-    noStroke();
-    fill(255);
-    circle(lookX - size * 0.12, lookY - size * 0.2, size * 0.2); // shine
+  let open = 1 - curl;
+  if (frameCount % 180 < 6) {
+    open = 0;
   }
+  scale(1, max(open, 0.08));
 
+  stroke(20);
+  strokeWeight(3);
+  fill(255);
+  circle(0, 0, size);
+  fill(120, 200, 90);
+  circle(0, 0, size * 0.7);
+
+  let lookX = map(mouseX, 0, width, -size * 0.12, size * 0.12);
+  let lookY = map(mouseY, 0, height, -size * 0.12, size * 0.12);
+  noStroke();
+  fill(20);
+  ellipse(lookX, lookY, size * 0.15, size * 0.6);
+  fill(255);
+  circle(lookX + size * 0.1, lookY - size * 0.15, size * 0.12); // shine
   pop();
 }
 
-// Three whiskers on one side of the face. side is 1 for right, -1 for left:
-// scale(-1, 1) mirrors the same lines onto the other cheek.
-function drawWhiskers(side) {
+// A whisker growing out of (x, y) at the given angle, with a dot at the end.
+function drawWhisker(x, y, angle, len) {
   push();
-  scale(side, 1);
-  strokeWeight(1.5);
-  line(20, 16, 78, 6);
-  line(20, 21, 82, 22);
-  line(20, 26, 76, 38);
+  translate(x, y);
+  rotate(angle);
+  stroke(20);
+  strokeWeight(2);
+  line(0, 0, len, 0);
+  noStroke();
+  fill(20);
+  circle(len, 0, 7);
+  pop();
+}
+
+// A paw: one big pink pad with three toe beans above it.
+function drawPaw(x, y, size) {
+  push();
+  translate(x, y);
+  fill(245);
+  stroke(20);
+  strokeWeight(4);
+  ellipse(0, 0, size * 1.6, size * 1.2);
+
+  noStroke();
+  fill(240, 120, 150);
+  ellipse(0, size * 0.15, size * 0.7, size * 0.5);
+  for (let i = -1; i <= 1; i++) {
+    circle(i * size * 0.35, -size * 0.25, size * 0.25);
+  }
   pop();
 }
