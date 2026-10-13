@@ -1,12 +1,17 @@
 // Creature Prototype: an abstract black cat.
 // Built on the template: an 800x500 canvas, draw() only calls drawCreature(),
-// and every shape is placed relative to the origin at the center of the canvas.
+// and every shape is placed relative to an origin picked at random in setup().
 // Hold the mouse down and the cat curls up.
 
 let curl = 0; // 0 = relaxed, 1 = curled up
+let originX, originY; // where the cat sits, picked once per run
 
 function setup() {
   createCanvas(800, 500);
+  // keep the whole cat on the canvas: the tail reaches about 320px to the left,
+  // the body and whiskers about 130px to the right, above and below
+  originX = random(320, width - 130);
+  originY = random(130, height - 130);
 }
 
 function draw() {
@@ -16,7 +21,7 @@ function draw() {
 
 function drawCreature() {
   push();
-  translate(width / 2, height / 2); // (0, 0) is now the center of the canvas
+  translate(originX, originY); // (0, 0) is now the random origin
 
   // ease toward curled up while the mouse is held, back out when it's released
   curl = lerp(curl, mouseIsPressed ? 1 : 0, 0.08);
