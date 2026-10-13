@@ -1,17 +1,17 @@
 // Creature Prototype: an abstract black cat.
 // Built on the template: an 800x500 canvas, draw() only calls drawCreature(),
-// and every shape is placed relative to an origin picked at random in setup().
-// Hold the mouse down and the cat curls up.
+// and every shape is placed relative to an origin that wanders slowly around.
+// Hold the mouse down and the cat curls up and stops.
 
 let curl = 0; // 0 = relaxed, 1 = curled up
-let originX, originY; // where the cat sits, picked once per run
+let originX, originY; // where the cat is right now
+let noiseX, noiseY; // where we are in the noise() landscape for each direction
 
 function setup() {
   createCanvas(800, 500);
-  // keep the whole cat on the canvas: the tail reaches about 320px to the left,
-  // the body and whiskers about 130px to the right, above and below
-  originX = random(320, width - 130);
-  originY = random(130, height - 130);
+  // start at random, far-apart places in the noise so x and y move independently
+  noiseX = random(1000);
+  noiseY = random(1000);
 }
 
 function draw() {
@@ -20,8 +20,18 @@ function draw() {
 }
 
 function drawCreature() {
+  // noise() drifts smoothly between 0 and 1, so the cat wanders slowly.
+  // map() turns it into a position that keeps the whole cat on the canvas:
+  // the tail reaches about 320px to the left, the rest about 130px each way.
+  originX = constrain(map(noise(noiseX), 0.2, 0.8, 320, width - 130), 320, width - 130);
+  originY = constrain(map(noise(noiseY), 0.2, 0.8, 130, height - 130), 130, height - 130);
+  if (!mouseIsPressed) {
+    noiseX += 0.003; // smaller steps = slower wandering
+    noiseY += 0.003;
+  }
+
   push();
-  translate(originX, originY); // (0, 0) is now the random origin
+  translate(originX, originY); // (0, 0) is now wherever the cat has wandered to
 
   // ease toward curled up while the mouse is held, back out when it's released
   curl = lerp(curl, mouseIsPressed ? 1 : 0, 0.08);
