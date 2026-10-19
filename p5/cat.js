@@ -1,17 +1,19 @@
 // Creature Prototype: an abstract black cat.
 // Built on the template: an 800x500 canvas, draw() only calls drawCreature(),
 // and every shape is placed relative to an origin that wanders slowly around.
-// Hold the mouse down and the cat curls up and stops.
+// Hold the mouse down and the cat curls up, its eyes turn red,
+// and it runs away from wherever you're pressing.
 
 let curl = 0; // 0 = relaxed, 1 = curled up
 let originX, originY; // where the cat is right now
-let noiseX, noiseY; // where we are in the noise() landscape for each direction
+let wanderT; // where we are in the noise() landscape
 
 function setup() {
   createCanvas(800, 500);
-  // start at random, far-apart places in the noise so x and y move independently
-  noiseX = random(1000);
-  noiseY = random(1000);
+  // start somewhere random, with the whole cat on the canvas
+  originX = random(320, width - 130);
+  originY = random(130, height - 130);
+  wanderT = random(1000);
 }
 
 function draw() {
@@ -20,15 +22,22 @@ function draw() {
 }
 
 function drawCreature() {
-  // noise() drifts smoothly between 0 and 1, so the cat wanders slowly.
-  // map() turns it into a position that keeps the whole cat on the canvas:
-  // the tail reaches about 320px to the left, the rest about 130px each way.
-  originX = constrain(map(noise(noiseX), 0.2, 0.8, 320, width - 130), 320, width - 130);
-  originY = constrain(map(noise(noiseY), 0.2, 0.8, 130, height - 130), 130, height - 130);
-  if (!mouseIsPressed) {
-    noiseX += 0.003; // smaller steps = slower wandering
-    noiseY += 0.003;
+  if (mouseIsPressed) {
+    // run away: atan2() gives the direction from the mouse to the cat
+    let away = atan2(originY - mouseY, originX - mouseX);
+    originX += cos(away) * 3;
+    originY += sin(away) * 3;
+  } else {
+    // wander: noise() slowly turns the direction the cat is heading
+    let heading = noise(wanderT) * TWO_PI * 2;
+    originX += cos(heading) * 0.4; // smaller steps = slower wandering
+    originY += sin(heading) * 0.4;
+    wanderT += 0.005;
   }
+  // keep the whole cat on the canvas: the tail reaches about 320px to the left,
+  // the body and whiskers about 130px to the right, above and below
+  originX = constrain(originX, 320, width - 130);
+  originY = constrain(originY, 130, height - 130);
 
   push();
   translate(originX, originY); // (0, 0) is now wherever the cat has wandered to
@@ -87,14 +96,14 @@ function drawTail(x, y, segments) {
 }
 
 // A yellow eye with a slit pupil that follows the mouse.
-// It squeezes shut as the cat curls up.
+// As the cat curls up it narrows into an angry red slit.
 function drawEye(x, y, size) {
   push();
   translate(x, y);
-  scale(1, max(1 - curl, 0.08));
+  scale(1, 1 - curl * 0.5);
 
   noStroke();
-  fill(250, 210, 60);
+  fill(lerpColor(color(250, 210, 60), color(230, 30, 30), curl)); // yellow to red
   circle(0, 0, size);
 
   let lookX = map(mouseX, 0, width, -size * 0.15, size * 0.15);
