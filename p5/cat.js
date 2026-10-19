@@ -2,7 +2,7 @@
 // Built on the template: an 800x500 canvas, draw() only calls drawCreature(),
 // and every shape is placed relative to an origin that wanders slowly around.
 // Hold the mouse down and the cat curls up, its eyes turn red,
-// and it runs away from wherever you're pressing.
+// and it runs away from wherever you're pressing. It floats in outer space.
 
 let curl = 0; // 0 = relaxed, 1 = curled up
 let originX, originY; // where the cat is right now
@@ -17,11 +17,13 @@ function setup() {
 }
 
 function draw() {
-  background(120, 190, 200);
+  background(35, 25, 85); // deep space purple
   drawCreature();
 }
 
 function drawCreature() {
+  drawSpace();
+
   if (mouseIsPressed) {
     // run away: atan2() gives the direction from the mouse to the cat
     let away = atan2(originY - mouseY, originX - mouseX);
@@ -61,6 +63,42 @@ function drawCreature() {
     drawWhisker(-20, 25, PI - i * 0.3, whiskerLen); // left side
   }
 
+  pop();
+}
+
+// Twinkling stars and two planets behind the cat.
+function drawSpace() {
+  push();
+  // randomSeed() makes random() give the same numbers every frame,
+  // so the stars stay in place instead of jumping around
+  randomSeed(7);
+  noStroke();
+  for (let i = 0; i < 150; i++) {
+    let x = random(width);
+    let y = random(height);
+    let size = random(1, 3.5);
+    let brightness = 150 + sin(frameCount * 0.05 + i) * 100; // twinkle
+    fill(255, brightness);
+    circle(x, y, size);
+  }
+  pop();
+
+  drawPlanet(110, 90, 70, color(240, 150, 80), 0.3);
+  drawPlanet(720, 410, 40, color(200, 120, 220), -0.5);
+}
+
+// A planet with a tilted ring around it.
+function drawPlanet(x, y, size, c, tilt) {
+  push();
+  translate(x, y);
+  rotate(tilt);
+  noStroke();
+  fill(c);
+  circle(0, 0, size);
+  noFill();
+  stroke(255, 230, 180, 180);
+  strokeWeight(3);
+  ellipse(0, 0, size * 1.9, size * 0.5);
   pop();
 }
 
